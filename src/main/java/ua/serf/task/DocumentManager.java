@@ -4,7 +4,11 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.time.Instant;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * For implement this task focus on clear code, and make this solution as simple readable as possible
@@ -57,10 +61,11 @@ public class DocumentManager {
      * @return list matched documents
      */
     public List<Document> search(SearchRequest request) {
-
-        return Collections.emptyList();
+        return storage.stream()
+                .filter(doc -> matchesRequest(doc, request))
+                .collect(Collectors.toList());
     }
-
+    
     /**
      * Implementation this method should find document by id
      *
@@ -68,8 +73,33 @@ public class DocumentManager {
      * @return optional document
      */
     public Optional<Document> findById(String id) {
+        return storage.stream()
+                .filter(doc -> doc.getId().equals(id))
+                .findFirst();
+    }
 
-        return Optional.empty();
+    private boolean matchesRequest(Document doc, SearchRequest request) {
+        if (request.getTitlePrefixes() != null) {
+            boolean matchesTitlePrefix = request.getTitlePrefixes().stream()
+                    .anyMatch(prefix -> doc.getTitle() != null && doc.getTitle().startsWith(prefix));
+            if (!matchesTitlePrefix) return false;
+        }
+        if (request.getContainsContents() != null) {
+            boolean matchesContent = request.getContainsContents().stream()
+                    .anyMatch(content -> doc.getContent() != null && doc.getContent().contains(content));
+            if (!matchesContent) return false;
+        }
+        if (request.getAuthorIds() != null) {
+            boolean matchesAuthorId = request.getAuthorIds().contains(doc.getAuthor() != null ? doc.getAuthor().getId() : null);
+            if (!matchesAuthorId) return false;
+        }
+        if (request.getCreatedFrom() != null && doc.getCreated() != null) {
+            if (doc.getCreated().isBefore(request.getCreatedFrom())) return false;
+        }
+        if (request.getCreatedTo() != null && doc.getCreated() != null) {
+            if (doc.getCreated().isAfter(request.getCreatedTo())) return false;
+        }
+        return true;
     }
 
     private String generateUniqueId() {
